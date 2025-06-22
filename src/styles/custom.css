@@ -1,0 +1,296 @@
+/* Estilos globales para complementar MUI */
+
+/* Animaciones personalizadas */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Clases de utilidad */
+.fade-in {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.4s ease-out;
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Efectos de hover personalizados */
+.hover-lift {
+  transition: all 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Gradientes personalizados */
+.gradient-primary {
+  background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+}
+
+.gradient-warning {
+  background: linear-gradient(135deg, #ed6c02 0%, #ff9800 100%);
+}
+
+.gradient-info {
+  background: linear-gradient(135deg, #0288d1 0%, #03a9f4 100%);
+}
+
+/* Estados de carga */
+.loading-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Textos personalizados */
+.text-gradient {
+  background: linear-gradient(135deg, #1976d2, #42a5f5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Layout helpers */
+.full-height {
+  min-height: 100vh;
+}
+
+.center-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.space-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Responsive helpers */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Overlay para modals */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1300;
+}
+
+/* Focus styles mejorados */
+.focus-ring {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Estados de éxito y error */
+.success-state {
+  color: #2e7d32;
+  background-color: rgba(46, 125, 50, 0.1);
+  border: 1px solid rgba(46, 125, 50, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.error-state {
+  color: #d32f2f;
+  background-color: rgba(211, 47, 47, 0.1);
+  border: 1px solid rgba(211, 47, 47, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.warning-state {
+  color: #ed6c02;
+  background-color: rgba(237, 108, 2, 0.1);
+  border: 1px solid rgba(237, 108, 2, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.info-state {
+  color: #0288d1;
+  background-color: rgba(2, 136, 209, 0.1);
+  border: 1px solid rgba(2, 136, 209, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+/* Mejoras para formularios */
+.form-section {
+  margin-bottom: 32px;
+  padding: 24px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.form-section h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+/* Mejoras para listas */
+.custom-list-item {
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.custom-list-item:hover {
+  background-color: rgba(25, 118, 210, 0.08);
+  transform: translateX(4px);
+}
+
+/* Badges personalizados */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-active {
+  background-color: rgba(46, 125, 50, 0.1);
+  color: #2e7d32;
+  border: 1px solid rgba(46, 125, 50, 0.3);
+}
+
+.status-winning {
+  background-color: rgba(237, 108, 2, 0.1);
+  color: #ed6c02;
+  border: 1px solid rgba(237, 108, 2, 0.3);
+}
+
+.status-ended {
+  background-color: rgba(158, 158, 158, 0.1);
+  color: #757575;
+  border: 1px solid rgba(158, 158, 158, 0.3);
+}
+
+.status-won {
+  background-color: rgba(46, 125, 50, 0.1);
+  color: #2e7d32;
+  border: 1px solid rgba(46, 125, 50, 0.3);
+}
+
+.status-lost {
+  background-color: rgba(211, 47, 47, 0.1);
+  color: #d32f2f;
+  border: 1px solid rgba(211, 47, 47, 0.3);
+}
+
+/* Loading states */
+.loading-dots {
+  display: inline-block;
+}
+
+.loading-dots::after {
+  content: "";
+  animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+  0%,
+  20% {
+    content: "";
+  }
+  40% {
+    content: ".";
+  }
+  60% {
+    content: "..";
+  }
+  80%,
+  100% {
+    content: "...";
+  }
+}
