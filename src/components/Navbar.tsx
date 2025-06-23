@@ -1,33 +1,38 @@
-import React from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Add as AddIcon,
+  Gavel as GavelIcon,
+  Home as HomeIcon,
+  Login as LoginIcon,
+  Logout as LogoutIcon,
+  Menu as MenuIcon,
+  Person as PersonIcon,
+} from "@mui/icons-material";
 import {
   AppBar,
-  Toolbar,
-  Typography,
-  Button,
+  Avatar,
   Box,
+  Button,
+  Chip,
   Container,
   IconButton,
   Menu,
   MenuItem,
+  Toolbar,
+  Typography,
   useMediaQuery,
   useTheme,
-  Avatar,
-  Chip,
 } from "@mui/material";
-import {
-  Menu as MenuIcon,
-  Gavel as GavelIcon,
-  Person as PersonIcon,
-  Add as AddIcon,
-  Home as HomeIcon,
-  Login as LoginIcon,
-  Logout as LogoutIcon,
-} from "@mui/icons-material";
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import AuthDialog from "./AuthDialog";
 
 interface NavbarProps {
   user?: {
+    id: string;
     name: string;
+    email?: string;
+    role?: string;
     avatar?: string;
   } | null;
 }
@@ -37,23 +42,13 @@ function Navbar({ user = null }: NavbarProps) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const { logout } = useAuth();
 
   const [mobileMenuAnchor, setMobileMenuAnchor] =
     React.useState<null | HTMLElement>(null);
   const [profileMenuAnchor, setProfileMenuAnchor] =
     React.useState<null | HTMLElement>(null);
-
-  const navigationItems = [
-    { path: "/", label: "Inicio", icon: <HomeIcon /> },
-    { path: "/auctions", label: "Subastas", icon: <GavelIcon /> },
-    { path: "/auctions/create", label: "Crear Subasta", icon: <AddIcon /> },
-  ];
-
-  const isActive = (path: string) => {
-    if (path === "/" && location.pathname === "/") return true;
-    if (path !== "/" && location.pathname.startsWith(path)) return true;
-    return false;
-  };
+  const [showAuthDialog, setShowAuthDialog] = React.useState(false);
 
   const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setMobileMenuAnchor(event.currentTarget);
@@ -72,9 +67,35 @@ function Navbar({ user = null }: NavbarProps) {
   };
 
   const handleLogout = () => {
-    // TODO: Implementar logout
-    console.log("Logout");
+    logout();
+    navigate("/");
     handleProfileMenuClose();
+  };
+
+  const handleCreateAuctionClick = () => {
+    if (!user) {
+      setShowAuthDialog(true);
+      return;
+    }
+    navigate("/auctions/create");
+  };
+
+  const navigationItems = [
+    { path: "/", label: "Inicio", icon: <HomeIcon /> },
+    { path: "/auctions", label: "Subastas", icon: <GavelIcon /> },
+    {
+      path: "/auctions/create",
+      label: "Crear Subasta",
+      icon: <AddIcon />,
+      onClick: handleCreateAuctionClick,
+      requiresAuth: true,
+    },
+  ];
+
+  const isActive = (path: string) => {
+    if (path === "/" && location.pathname === "/") return true;
+    if (path !== "/" && location.pathname.startsWith(path)) return true;
+    return false;
   };
 
   return (
@@ -114,8 +135,7 @@ function Navbar({ user = null }: NavbarProps) {
               {navigationItems.map((item) => (
                 <Button
                   key={item.path}
-                  component={Link}
-                  to={item.path}
+                  onClick={item.onClick || (() => navigate(item.path))}
                   startIcon={item.icon}
                   variant={isActive(item.path) ? "contained" : "text"}
                   color={isActive(item.path) ? "primary" : "inherit"}
@@ -235,7 +255,11 @@ function Navbar({ user = null }: NavbarProps) {
               <MenuItem
                 key={item.path}
                 onClick={() => {
-                  navigate(item.path);
+                  if (item.onClick) {
+                    item.onClick();
+                  } else {
+                    navigate(item.path);
+                  }
                   handleMobileMenuClose();
                 }}
                 selected={isActive(item.path)}
@@ -249,6 +273,15 @@ function Navbar({ user = null }: NavbarProps) {
           </Menu>
         </Toolbar>
       </Container>
+
+      {/* Auth Dialog */}
+      <AuthDialog
+        open={showAuthDialog}
+        onClose={() => setShowAuthDialog(false)}
+        title="Iniciar Sesión para Crear Subastas"
+        message="Para crear y gestionar subastas necesitas tener una cuenta."
+        action="crear subastas"
+      />
     </AppBar>
   );
 }

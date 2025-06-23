@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -28,6 +28,8 @@ import {
   Cancel as CancelIcon,
   Warning as WarningIcon,
 } from "@mui/icons-material";
+import AuthDialog from "../../components/AuthDialog";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface UserSettings {
   name: string;
@@ -51,12 +53,13 @@ interface UserSettings {
 function ProfileSettings() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [settings, setSettings] = useState<UserSettings>({
-    name: "Juan Pérez",
-    email: "juan.perez@email.com",
-    phone: "+56 9 1234 5678",
-    avatar: "https://via.placeholder.com/150",
+    name: "",
+    email: "",
+    phone: "",
+    avatar: "",
     notifications: {
       email: true,
       sms: false,
@@ -76,6 +79,43 @@ function ProfileSettings() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+
+  // Check authentication
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setShowAuthDialog(true);
+    }
+  }, [authLoading, isAuthenticated]);
+
+  // Load user data when available
+  useEffect(() => {
+    if (user) {
+      setSettings((prev) => ({
+        ...prev,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar || "https://via.placeholder.com/150",
+        // TODO: Load other settings from API
+      }));
+    }
+  }, [user]);
+
+  // Show auth dialog if not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <AuthDialog
+        open={showAuthDialog}
+        onClose={() => {
+          setShowAuthDialog(false);
+          navigate("/");
+        }}
+        title="Acceso Restringido"
+        message="Para acceder a la configuración necesitas iniciar sesión."
+        action="configurar tu perfil"
+      />
+    );
+  }
 
   const handleInputChange = (field: keyof UserSettings, value: string) => {
     setSettings((prev) => ({
@@ -130,7 +170,8 @@ function ProfileSettings() {
     setMessage(null);
 
     try {
-      // TODO: Enviar datos a la API
+      // TODO: Update user data via GraphQL mutation
+      // For now, just simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setMessage({
@@ -151,6 +192,7 @@ function ProfileSettings() {
       )
     ) {
       try {
+        // TODO: Implement account deletion via GraphQL mutation
         alert(
           "Funcionalidad de eliminación de cuenta pendiente de implementar"
         );
@@ -159,6 +201,16 @@ function ProfileSettings() {
       }
     }
   };
+
+  if (authLoading) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Box sx={{ textAlign: "center" }}>
+          <Typography>Cargando...</Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -225,7 +277,7 @@ function ProfileSettings() {
                   accept="image/*"
                   onChange={handleAvatarChange}
                   style={{ display: "none" }}
-                />{" "}
+                />
                 <Typography variant="caption" color="text.secondary">
                   Haz clic en el ícono para cambiar tu foto
                 </Typography>
@@ -251,6 +303,7 @@ function ProfileSettings() {
                     value={settings.email}
                     onChange={(e) => handleInputChange("email", e.target.value)}
                     required
+                    disabled // Email should not be editable in most cases
                   />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>

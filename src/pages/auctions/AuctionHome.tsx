@@ -1,56 +1,42 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import {
-  Container,
-  Grid,
+  FilterList as FilterIcon,
+  Gavel as GavelIcon,
+  Person as PersonIcon,
+  Search as SearchIcon,
+  Sort as SortIcon,
+  AccessTime as TimeIcon,
+  TrendingUp as TrendingUpIcon,
+  Visibility as VisibilityIcon,
+} from "@mui/icons-material";
+import {
+  Alert,
+  Avatar,
+  Box,
+  Button,
+  ButtonGroup,
   Card,
   CardContent,
   CardMedia,
-  Typography,
-  Button,
   Chip,
-  Box,
-  TextField,
-  InputAdornment,
-  Paper,
-  Stack,
-  Avatar,
-  Skeleton,
+  Container,
   FormControl,
+  Grid,
+  InputAdornment,
   InputLabel,
-  Select,
   MenuItem,
-  ButtonGroup,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  TextField,
+  Typography,
 } from "@mui/material";
-import {
-  Search as SearchIcon,
-  Gavel as GavelIcon,
-  TrendingUp as TrendingUpIcon,
-  AccessTime as TimeIcon,
-  Person as PersonIcon,
-  Visibility as VisibilityIcon,
-  FilterList as FilterIcon,
-  Sort as SortIcon,
-} from "@mui/icons-material";
-
-interface Auction {
-  id: string;
-  title: string;
-  description: string;
-  currentBid: number;
-  minBid: number;
-  endDate: string;
-  image: string;
-  seller: {
-    name: string;
-    avatar?: string;
-    rating: number;
-  };
-  totalBids: number;
-  views: number;
-  status: "active" | "ending_soon" | "upcoming";
-  category: string;
-}
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import AuthDialog from "../../components/AuthDialog";
+import { useAuth } from "../../contexts/AuthContext";
+import { useAuctions } from "../../hooks/useAuctions";
+import "./AuctionHome.css";
 
 type SortOption =
   | "ending_soon"
@@ -58,139 +44,68 @@ type SortOption =
   | "lowest_bid"
   | "newest"
   | "most_popular";
-type FilterOption = "all" | "active" | "ending_soon" | "upcoming";
+type FilterOption = "all" | "active" | "pending" | "completed" | "cancelled";
 
 function AuctionHome() {
-  const [auctions, setAuctions] = useState<Auction[]>([]);
-  const [filteredAuctions, setFilteredAuctions] = useState<Auction[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("ending_soon");
   const [filterBy, setFilterBy] = useState<FilterOption>("all");
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
-  useEffect(() => {
-    const fetchAuctions = async () => {
-      try {
-        // TODO: Reemplazar con API real
-        const mockAuctions: Auction[] = [
-          {
-            id: "1",
-            title: "iPhone 15 Pro Max 256GB",
-            description:
-              "Nuevo iPhone 15 Pro Max de 256GB en color azul titanio",
-            currentBid: 950000,
-            minBid: 800000,
-            endDate: "2025-01-25T20:00:00Z",
-            image: "https://via.placeholder.com/300x200",
-            seller: {
-              name: "Juan Pérez",
-              rating: 4.8,
-            },
-            totalBids: 12,
-            views: 156,
-            status: "active",
-            category: "Electrónicos",
-          },
-          {
-            id: "2",
-            title: "MacBook Air M2",
-            description: "MacBook Air con chip M2, 8GB RAM, 256GB SSD",
-            currentBid: 850000,
-            minBid: 700000,
-            endDate: "2025-01-22T15:00:00Z",
-            image: "https://via.placeholder.com/300x200",
-            seller: {
-              name: "María González",
-              rating: 4.9,
-            },
-            totalBids: 8,
-            views: 89,
-            status: "ending_soon",
-            category: "Electrónicos",
-          },
-          {
-            id: "3",
-            title: "Samsung Galaxy S24 Ultra",
-            description: "Samsung Galaxy S24 Ultra 512GB, color negro",
-            currentBid: 720000,
-            minBid: 600000,
-            endDate: "2025-02-10T20:00:00Z",
-            image: "https://via.placeholder.com/300x200",
-            seller: {
-              name: "Carlos Morales",
-              rating: 4.7,
-            },
-            totalBids: 15,
-            views: 234,
-            status: "active",
-            category: "Electrónicos",
-          },
-          {
-            id: "4",
-            title: "iPad Pro 12.9 M2",
-            description: "iPad Pro 12.9 pulgadas con M2, 128GB",
-            currentBid: 0,
-            minBid: 500000,
-            endDate: "2025-01-30T10:00:00Z",
-            image: "https://via.placeholder.com/300x200",
-            seller: {
-              name: "Ana Torres",
-              rating: 4.6,
-            },
-            totalBids: 0,
-            views: 23,
-            status: "upcoming",
-            category: "Electrónicos",
-          },
-        ];
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
-        setAuctions(mockAuctions);
-      } catch (error) {
-        console.error("Error fetching auctions:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Use the auctions hook instead of API hook
+  const { auctions, loading, error, refetch, clearError } = useAuctions({
+    page: 1,
+    limit: 50,
+    sortBy: "endDate",
+    sortOrder: "asc",
+  });
 
-    fetchAuctions();
-  }, []);
-
-  useEffect(() => {
-    let filtered = auctions;
-
-    // Filtrar por término de búsqueda
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (auction) =>
-          auction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  // Filter auctions based on search term and local filters
+  const filteredAuctions = auctions
+    .filter((auction) => {
+      const matchesSearch = searchTerm
+        ? auction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           auction.description.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+        : true;
 
-    // Filtrar por estado
-    if (filterBy !== "all") {
-      filtered = filtered.filter((auction) => auction.status === filterBy);
-    }
+      // Fix the filter logic to handle different status formats
+      let matchesFilter = false;
+      if (filterBy === "all") {
+        matchesFilter = true;
+      } else if (filterBy === "active") {
+        // Match all active status variations
+        matchesFilter =
+          auction.status === "active" ||
+          auction.status === "ACTIVE" ||
+          auction.status === "Hello";
+      } else {
+        matchesFilter = auction.status === filterBy;
+      }
 
-    // Ordenar
-    filtered.sort((a, b) => {
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => {
       switch (sortBy) {
         case "ending_soon":
-          return new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
+          return (
+            new Date(a.end_time).getTime() - new Date(b.end_time).getTime()
+          );
         case "highest_bid":
           return b.currentBid - a.currentBid;
         case "lowest_bid":
           return a.currentBid - b.currentBid;
         case "most_popular":
-          return b.views - a.views;
+          return (b.views || 0) - (a.views || 0);
         case "newest":
         default:
-          return new Date(b.endDate).getTime() - new Date(a.endDate).getTime();
+          return (
+            new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+          );
       }
     });
-
-    setFilteredAuctions(filtered);
-  }, [auctions, searchTerm, sortBy, filterBy]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("es-CL", {
@@ -215,20 +130,56 @@ function AuctionHome() {
 
   const getStatusChip = (status: string) => {
     const statusConfig = {
+      pending: { label: "Pendiente", color: "warning" as const },
       active: { label: "Activa", color: "success" as const },
-      ending_soon: { label: "Terminando Pronto", color: "warning" as const },
-      upcoming: { label: "Próximamente", color: "info" as const },
+      completed: { label: "Completada", color: "default" as const },
+      cancelled: { label: "Cancelada", color: "error" as const },
+      // Keep old values for backward compatibility
+      ACTIVE: { label: "Activa", color: "success" as const },
+      ENDED: { label: "Finalizada", color: "default" as const },
+      Hello: { label: "Activa", color: "success" as const }, // Handle test data
     };
-    const config = statusConfig[status as keyof typeof statusConfig];
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      label: status,
+      color: "default" as const,
+    };
     return (
       <Chip
-        label={config?.label || status}
-        color={config?.color || "default"}
+        label={config.label}
+        color={config.color}
         size="small"
         sx={{ fontWeight: 600 }}
       />
     );
   };
+
+  const handleCreateAuctionClick = () => {
+    if (!isAuthenticated) {
+      setShowAuthDialog(true);
+      return;
+    }
+    navigate("/auctions/create");
+  };
+
+  // Error state
+  if (error && auctions.length === 0) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Paper sx={{ p: 6, textAlign: "center" }}>
+          <GavelIcon sx={{ fontSize: 64, color: "error.main", mb: 2 }} />
+          <Typography variant="h6" color="error" gutterBottom>
+            Error al cargar las subastas
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            {error}
+          </Typography>
+          <Button variant="contained" onClick={() => refetch()}>
+            Reintentar
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
 
   if (loading) {
     return (
@@ -274,12 +225,12 @@ function AuctionHome() {
               {auctions.length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Subastas Activas
+              Subastas Disponibles
             </Typography>
           </Box>
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="h4" fontWeight="bold" color="success.main">
-              {auctions.reduce((acc, auction) => acc + auction.totalBids, 0)}
+              {auctions.reduce((acc, auction) => acc + auction.bids.length, 0)}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Ofertas Realizadas
@@ -287,16 +238,28 @@ function AuctionHome() {
           </Box>
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="h4" fontWeight="bold" color="info.main">
-              {auctions.filter((a) => a.status === "ending_soon").length}
+              {
+                auctions.filter(
+                  (a) => a.status === "active" || a.status === "ACTIVE"
+                ).length
+              }
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Terminando Pronto
+              Subastas Activas
             </Typography>
           </Box>
         </Stack>
-      </Box>{" "}
+      </Box>
+
       {/* Filtros y Búsqueda */}
       <Paper elevation={0} sx={{ p: 3, mb: 4, bgcolor: "grey.50" }}>
+        {/* Error message */}
+        {error && (
+          <Alert severity="warning" sx={{ mb: 2 }} onClose={clearError}>
+            {error}
+          </Alert>
+        )}
+
         {/* Filtros rápidos con ButtonGroup */}
         <Box sx={{ mb: 3 }}>
           <Typography
@@ -323,29 +286,21 @@ function AuctionHome() {
               onClick={() => setFilterBy("active")}
               color="success"
             >
-              Activas ({auctions.filter((a) => a.status === "active").length})
-            </Button>
-            <Button
-              variant={filterBy === "ending_soon" ? "contained" : "outlined"}
-              onClick={() => setFilterBy("ending_soon")}
-              color="warning"
-            >
-              Terminando Pronto (
-              {auctions.filter((a) => a.status === "ending_soon").length})
-            </Button>
-            <Button
-              variant={filterBy === "upcoming" ? "contained" : "outlined"}
-              onClick={() => setFilterBy("upcoming")}
-              color="info"
-            >
-              Próximamente (
-              {auctions.filter((a) => a.status === "upcoming").length})
+              Activas (
+              {
+                auctions.filter(
+                  (a) =>
+                    a.status === "active" ||
+                    a.status === "ACTIVE" ||
+                    a.status === "Hello"
+                ).length
+              }
+              )
             </Button>
           </ButtonGroup>
         </Box>
 
         <Grid container spacing={2} alignItems="center">
-          {" "}
           <Grid size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth
@@ -372,8 +327,9 @@ function AuctionHome() {
               >
                 <MenuItem value="all">Todas</MenuItem>
                 <MenuItem value="active">Activas</MenuItem>
-                <MenuItem value="ending_soon">Terminando Pronto</MenuItem>
-                <MenuItem value="upcoming">Próximamente</MenuItem>
+                <MenuItem value="pending">Pendientes</MenuItem>
+                <MenuItem value="completed">Completadas</MenuItem>
+                <MenuItem value="cancelled">Canceladas</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -396,8 +352,7 @@ function AuctionHome() {
           </Grid>
           <Grid size={{ xs: 12, md: 2 }}>
             <Button
-              component={Link}
-              to="/auctions/create"
+              onClick={handleCreateAuctionClick}
               variant="contained"
               fullWidth
               startIcon={<GavelIcon />}
@@ -408,6 +363,7 @@ function AuctionHome() {
           </Grid>
         </Grid>
       </Paper>
+
       {/* Lista de Subastas */}
       {filteredAuctions.length === 0 ? (
         <Paper sx={{ p: 6, textAlign: "center" }}>
@@ -421,8 +377,7 @@ function AuctionHome() {
               : "No hay subastas disponibles en este momento"}
           </Typography>
           <Button
-            component={Link}
-            to="/auctions/create"
+            onClick={handleCreateAuctionClick}
             variant="contained"
             startIcon={<GavelIcon />}
           >
@@ -444,7 +399,7 @@ function AuctionHome() {
                   <CardMedia
                     component="img"
                     height="200"
-                    image={auction.image}
+                    image={auction.images[0]}
                     alt={auction.title}
                   />
                   <Box sx={{ position: "absolute", top: 12, right: 12 }}>
@@ -452,7 +407,7 @@ function AuctionHome() {
                   </Box>
                   <Box sx={{ position: "absolute", top: 12, left: 12 }}>
                     <Chip
-                      label={auction.category}
+                      label={auction.category || "Sin categoría"}
                       size="small"
                       sx={{ bgcolor: "rgba(0,0,0,0.7)", color: "white" }}
                     />
@@ -467,16 +422,32 @@ function AuctionHome() {
                     component="h3"
                     fontWeight="bold"
                     gutterBottom
+                    sx={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                    }}
                   >
                     {auction.title}
                   </Typography>
                   <Typography
                     variant="body2"
                     color="text.secondary"
-                    sx={{ mb: 2, flexGrow: 1 }}
+                    sx={{
+                      mb: 2,
+                      flexGrow: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                    }}
                   >
                     {auction.description}
-                  </Typography>{" "}
+                  </Typography>
+
                   {/* Información del vendedor */}
                   <Box
                     sx={{
@@ -492,14 +463,15 @@ function AuctionHome() {
                     <PersonIcon fontSize="small" color="primary" />
                     <Avatar
                       sx={{ width: 24, height: 24 }}
-                      src={auction.seller.avatar}
+                      src={auction.seller?.avatar}
                     >
-                      {auction.seller.name.charAt(0)}
+                      {auction.seller?.name.charAt(0)}
                     </Avatar>
                     <Typography variant="caption" color="text.secondary">
-                      {auction.seller.name} ⭐ {auction.seller.rating}
+                      {auction.seller?.name} ⭐ {auction.seller?.rating}
                     </Typography>
                   </Box>
+
                   {/* Precio actual */}
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="body2" color="text.secondary">
@@ -512,9 +484,13 @@ function AuctionHome() {
                     >
                       {auction.currentBid > 0
                         ? formatPrice(auction.currentBid)
-                        : "Sin ofertas"}
+                        : formatPrice(parseFloat(auction.base_price))}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {auction.currency}
                     </Typography>
                   </Box>
+
                   {/* Estadísticas */}
                   <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
                     <Box
@@ -522,7 +498,7 @@ function AuctionHome() {
                     >
                       <TrendingUpIcon fontSize="small" color="success" />
                       <Typography variant="caption">
-                        {auction.totalBids} ofertas
+                        {auction.bids.length} ofertas
                       </Typography>
                     </Box>
                     <Box
@@ -530,10 +506,11 @@ function AuctionHome() {
                     >
                       <VisibilityIcon fontSize="small" color="info" />
                       <Typography variant="caption">
-                        {auction.views} vistas
+                        {auction.views || 0} vistas
                       </Typography>
                     </Box>
                   </Stack>
+
                   {/* Tiempo restante */}
                   <Box
                     sx={{
@@ -549,9 +526,10 @@ function AuctionHome() {
                       color="warning.main"
                       fontWeight="bold"
                     >
-                      {getTimeRemaining(auction.endDate)}
+                      {getTimeRemaining(auction.end_time)}
                     </Typography>
                   </Box>
+
                   {/* Botón de acción */}
                   <Button
                     component={Link}
@@ -568,6 +546,27 @@ function AuctionHome() {
           ))}
         </Grid>
       )}
+
+      {/* Refresh button */}
+      <Box sx={{ mt: 4, textAlign: "center" }}>
+        <Button
+          variant="outlined"
+          onClick={() => refetch()}
+          disabled={loading}
+          startIcon={loading ? undefined : <GavelIcon />}
+        >
+          {loading ? "Cargando..." : "Actualizar Subastas"}
+        </Button>
+      </Box>
+
+      {/* Auth Dialog */}
+      <AuthDialog
+        open={showAuthDialog}
+        onClose={() => setShowAuthDialog(false)}
+        title="Crear Cuenta para Subastar"
+        message="Para crear subastas necesitas tener una cuenta registrada en SubastasApp."
+        action="crear y gestionar subastas"
+      />
     </Container>
   );
 }

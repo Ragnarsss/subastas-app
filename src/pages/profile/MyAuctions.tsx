@@ -28,6 +28,8 @@ import {
   CalendarToday as CalendarIcon,
   TrendingUp as TrendingUpIcon,
 } from "@mui/icons-material";
+import AuthDialog from "../../components/AuthDialog";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface UserAuction {
   id: string;
@@ -47,15 +49,26 @@ type FilterType = "all" | "active" | "ended" | "upcoming" | "cancelled";
 
 function MyAuctions() {
   const navigate = useNavigate();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [auctions, setAuctions] = useState<UserAuction[]>([]);
   const [filteredAuctions, setFilteredAuctions] = useState<UserAuction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+
+  // Check authentication
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setShowAuthDialog(true);
+    }
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
     const fetchMyAuctions = async () => {
+      if (!user) return;
+
       try {
-        // TODO: Reemplazar con API real
+        // TODO: Fetch real auctions from API using user.id
         const mockAuctions: UserAuction[] = [
           {
             id: "1",
@@ -121,7 +134,23 @@ function MyAuctions() {
     };
 
     fetchMyAuctions();
-  }, []);
+  }, [user]);
+
+  // Show auth dialog if not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <AuthDialog
+        open={showAuthDialog}
+        onClose={() => {
+          setShowAuthDialog(false);
+          navigate("/");
+        }}
+        title="Acceso Restringido"
+        message="Para ver tus subastas necesitas iniciar sesión."
+        action="ver tus subastas"
+      />
+    );
+  }
 
   useEffect(() => {
     if (filter === "all") {
@@ -175,6 +204,7 @@ function MyAuctions() {
   const handleDeleteAuction = async (auctionId: string) => {
     if (window.confirm("¿Estás seguro de que quieres eliminar esta subasta?")) {
       try {
+        // TODO: Call API to delete auction
         setAuctions((prev) =>
           prev.filter((auction) => auction.id !== auctionId)
         );
@@ -187,7 +217,7 @@ function MyAuctions() {
 
   const counts = getFilterCounts();
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Grid container spacing={3}>

@@ -1,39 +1,37 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Container,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Box,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Stack,
-  Card,
-  CardMedia,
-  Alert,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-  InputAdornment,
-  Chip,
-} from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
-  Upload as UploadIcon,
-  PhotoCamera as PhotoCameraIcon,
-  Gavel as GavelIcon,
-  Preview as PreviewIcon,
-  Publish as PublishIcon,
-  MonetizationOn as MoneyIcon,
-  Schedule as ScheduleIcon,
   Description as DescriptionIcon,
+  Gavel as GavelIcon,
+  MonetizationOn as MoneyIcon,
+  Publish as PublishIcon,
+  Schedule as ScheduleIcon,
 } from "@mui/icons-material";
+import {
+  Alert,
+  Box,
+  Button,
+  Container,
+  FormControl,
+  Grid,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Step,
+  StepContent,
+  StepLabel,
+  Stepper,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import AuthDialog from "../../components/AuthDialog";
+import { useAuth } from "../../contexts/AuthContext";
+import { useAuctionAPI } from "../../hooks/useAuctionAPI";
+import "./CreateAuction.css";
 
 interface AuctionForm {
   title: string;
@@ -41,7 +39,8 @@ interface AuctionForm {
   category: string;
   startingBid: string;
   duration: string;
-  images: File[];
+  minBidIncrement: string;
+  currency: string;
 }
 
 const categories = [
@@ -67,6 +66,13 @@ const durations = [
 
 function CreateAuction() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const {
+    createAuction,
+    loading: apiLoading,
+    error: apiError,
+    clearError,
+  } = useAuctionAPI();
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<AuctionForm>({
@@ -75,13 +81,14 @@ function CreateAuction() {
     category: "",
     startingBid: "",
     duration: "7",
-    images: [],
+    minBidIncrement: "",
+    currency: "CLP",
   });
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   const steps = [
     "Información Básica",
     "Detalles y Precio",
-    "Imágenes",
     "Revisión y Publicación",
   ];
 
@@ -89,23 +96,6 @@ function CreateAuction() {
     setForm((prev) => ({
       ...prev,
       [field]: value,
-    }));
-  };
-
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length > 0) {
-      setForm((prev) => ({
-        ...prev,
-        images: [...prev.images, ...files].slice(0, 5), // Máximo 5 imágenes
-      }));
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
     }));
   };
 
@@ -124,18 +114,37 @@ function CreateAuction() {
   const handleSubmit = async () => {
     try {
       setLoading(true);
+      clearError();
 
-      // TODO: Implementar llamada a API
-      console.log("Crear subasta:", form);
+      const auctionData = {
+        title: form.title,
+        description: form.description,
+        category: form.category,
+        startingBid: parseFloat(form.startingBid),
+        duration: parseInt(form.duration),
+        minBidIncrement: form.minBidIncrement
+          ? parseFloat(form.minBidIncrement)
+          : undefined,
+        currency: form.currency,
+      };
 
-      // Simular delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const result = await createAuction(auctionData);
 
-      alert("¡Subasta creada exitosamente!");
+      if (result.error || !result.success) {
+        throw new Error(
+          result.error || result.message || "Error creating auction"
+        );
+      }
+
+      alert(`¡${result.message || "Subasta creada exitosamente"}!`);
       navigate("/auctions");
     } catch (error) {
       console.error("Error al crear subasta:", error);
-      alert("Error al crear la subasta");
+      alert(
+        `Error al crear la subasta: ${
+          error instanceof Error ? error.message : "Error desconocido"
+        }`
+      );
     } finally {
       setLoading(false);
     }
@@ -148,8 +157,6 @@ function CreateAuction() {
       case 1:
         return form.description.trim() !== "" && form.startingBid !== "";
       case 2:
-        return form.images.length > 0;
-      case 3:
         return true;
       default:
         return false;
@@ -229,6 +236,40 @@ function CreateAuction() {
               }}
             />
 
+            <TextField
+              fullWidth
+              type="number"
+              label="Incremento mínimo de puja"
+              value={form.minBidIncrement}
+              onChange={(e) =>
+                handleInputChange("minBidIncrement", e.target.value)
+              }
+              placeholder="Opcional - por defecto 5% del precio inicial"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <MoneyIcon color="action" />$
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            <FormControl fullWidth>
+              <InputLabel>Moneda</InputLabel>
+              <Select
+                value={form.currency}
+                label="Moneda"
+                onChange={(e) => handleInputChange("currency", e.target.value)}
+              >
+                <MenuItem value="USD">Dólar Americano (USD)</MenuItem>
+                <MenuItem value="EUR">Euro (EUR)</MenuItem>
+                <MenuItem value="CLP">Peso Chileno (CLP)</MenuItem>
+                <MenuItem value="ARS">Peso Argentino (ARS)</MenuItem>
+                <MenuItem value="BRL">Real Brasileño (BRL)</MenuItem>
+                <MenuItem value="MXN">Peso Mexicano (MXN)</MenuItem>
+              </Select>
+            </FormControl>
+
             <FormControl fullWidth>
               <InputLabel>Duración de la subasta</InputLabel>
               <Select
@@ -250,108 +291,12 @@ function CreateAuction() {
       case 2:
         return (
           <Stack spacing={3}>
-            <Alert severity="info">
-              Puedes subir hasta 5 imágenes. La primera imagen será la
-              principal.
-            </Alert>
-
-            <Box>
-              <input
-                accept="image/*"
-                style={{ display: "none" }}
-                id="image-upload"
-                multiple
-                type="file"
-                onChange={handleImageUpload}
-              />
-              <label htmlFor="image-upload">
-                <Button
-                  variant="outlined"
-                  component="span"
-                  startIcon={<UploadIcon />}
-                  fullWidth
-                  sx={{ py: 2 }}
-                  disabled={form.images.length >= 5}
-                >
-                  {form.images.length > 0
-                    ? `Agregar más imágenes (${form.images.length}/5)`
-                    : "Subir imágenes"}
-                </Button>
-              </label>
-            </Box>
-
-            {/* Botón alternativo con PhotoCameraIcon */}
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <Button
-                variant="text"
-                startIcon={<PhotoCameraIcon />}
-                onClick={() => document.getElementById("image-upload")?.click()}
-                disabled={form.images.length >= 5}
-              >
-                Desde Cámara
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<PreviewIcon />}
-                onClick={() => {
-                  // TODO: Vista previa de imágenes
-                  console.log("Vista previa");
-                }}
-                disabled={form.images.length === 0}
-              >
-                Vista Previa
-              </Button>
-            </Box>
-
-            {form.images.length > 0 && (
-              <Grid container spacing={2}>
-                {form.images.map((image, index) => (
-                  <Grid size={{ xs: 6, sm: 4 }} key={index}>
-                    <Card sx={{ position: "relative" }}>
-                      <CardMedia
-                        component="img"
-                        height={120}
-                        image={URL.createObjectURL(image)}
-                        alt={`Preview ${index + 1}`}
-                      />
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 8,
-                          right: 8,
-                          display: "flex",
-                          gap: 1,
-                        }}
-                      >
-                        {index === 0 && (
-                          <Chip
-                            label="Principal"
-                            color="primary"
-                            size="small"
-                            sx={{ fontSize: "0.7rem" }}
-                          />
-                        )}
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="error"
-                          sx={{ minWidth: "auto", p: 0.5 }}
-                          onClick={() => removeImage(index)}
-                        >
-                          ×
-                        </Button>
-                      </Box>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+            {apiError && (
+              <Alert severity="error" onClose={clearError}>
+                {apiError}
+              </Alert>
             )}
-          </Stack>
-        );
 
-      case 3:
-        return (
-          <Stack spacing={3}>
             <Alert severity="success">
               ¡Revisa los detalles de tu subasta antes de publicarla!
             </Alert>
@@ -359,7 +304,8 @@ function CreateAuction() {
             <Paper elevation={0} sx={{ p: 3, bgcolor: "grey.50" }}>
               <Typography variant="h6" gutterBottom>
                 Resumen de la Subasta
-              </Typography>{" "}
+              </Typography>
+
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -388,7 +334,10 @@ function CreateAuction() {
                     fontWeight={600}
                     color="primary.main"
                   >
-                    ${parseInt(form.startingBid || "0").toLocaleString("es-CL")}
+                    {form.currency} $
+                    {parseFloat(form.startingBid || "0").toLocaleString(
+                      "es-CL"
+                    )}
                   </Typography>
                 </Grid>
 
@@ -401,36 +350,101 @@ function CreateAuction() {
                   </Typography>
                 </Grid>
 
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Fecha de inicio:
+                  </Typography>
+                  <Typography variant="body1" fontWeight={600}>
+                    {new Date().toLocaleString("es-CL")}
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Fecha de finalización:
+                  </Typography>
+                  <Typography variant="body1" fontWeight={600}>
+                    {new Date(
+                      Date.now() + parseInt(form.duration) * 24 * 60 * 60 * 1000
+                    ).toLocaleString("es-CL")}
+                  </Typography>
+                </Grid>
+
+                {form.minBidIncrement && (
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Incremento mínimo:
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      fontWeight={600}
+                      color="secondary.main"
+                    >
+                      {form.currency} $
+                      {parseFloat(form.minBidIncrement).toLocaleString("es-CL")}
+                    </Typography>
+                  </Grid>
+                )}
+
+                {!form.minBidIncrement && (
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Incremento mínimo (automático):
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      fontWeight={600}
+                      color="secondary.main"
+                    >
+                      {form.currency} $
+                      {(
+                        parseFloat(form.startingBid || "0") * 0.05
+                      ).toLocaleString("es-CL")}
+                    </Typography>
+                  </Grid>
+                )}
+
                 <Grid size={{ xs: 12 }}>
                   <Typography variant="body2" color="text.secondary">
                     Descripción:
                   </Typography>
                   <Typography variant="body2">{form.description}</Typography>
                 </Grid>
-
-                <Grid size={{ xs: 12 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    Imágenes ({form.images.length}):
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, overflowX: "auto" }}>
-                    {form.images.map((image, index) => (
-                      <Card key={index} sx={{ minWidth: 60 }}>
-                        <CardMedia
-                          component="img"
-                          height={60}
-                          image={URL.createObjectURL(image)}
-                          alt={`Preview ${index + 1}`}
-                        />
-                      </Card>
-                    ))}
-                  </Box>
-                </Grid>
               </Grid>
             </Paper>
+
+            {/* Debug info - remove in production */}
+            <Box sx={{ mt: 2, p: 2, bgcolor: "grey.100", borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Datos que se enviarán a la API:
+              </Typography>
+              <Typography
+                variant="caption"
+                component="pre"
+                sx={{ display: "block", mt: 1, fontSize: "0.75rem" }}
+              >
+                {JSON.stringify(
+                  {
+                    user_id: localStorage.getItem("userId") || "user_default",
+                    item_id: `item_${Date.now()}`,
+                    title: form.title,
+                    description: form.description,
+                    start_time: new Date().toISOString(),
+                    end_time: new Date(
+                      Date.now() + parseInt(form.duration) * 24 * 60 * 60 * 1000
+                    ).toISOString(),
+                    base_price: form.startingBid,
+                    min_bid_increment:
+                      form.minBidIncrement ||
+                      (parseFloat(form.startingBid || "0") * 0.05).toString(),
+                    highest_bid: form.startingBid,
+                    currency: form.currency,
+                  },
+                  null,
+                  2
+                )}
+              </Typography>
+            </Box>
           </Stack>
         );
 
@@ -438,6 +452,31 @@ function CreateAuction() {
         return null;
     }
   };
+
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setShowAuthDialog(true);
+    }
+  }, [isAuthenticated]);
+
+  // If not authenticated, show auth dialog and prevent access
+  if (!isAuthenticated) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <AuthDialog
+          open={showAuthDialog}
+          onClose={() => {
+            setShowAuthDialog(false);
+            navigate("/auctions");
+          }}
+          title="Cuenta Requerida"
+          message="Para crear una subasta necesitas tener una cuenta registrada."
+          action="crear subastas"
+        />
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -487,10 +526,12 @@ function CreateAuction() {
                       <Button
                         variant="contained"
                         onClick={handleSubmit}
-                        disabled={loading || !isStepValid(index)}
+                        disabled={loading || apiLoading || !isStepValid(index)}
                         startIcon={<PublishIcon />}
                       >
-                        {loading ? "Publicando..." : "Publicar Subasta"}
+                        {loading || apiLoading
+                          ? "Publicando..."
+                          : "Publicar Subasta"}
                       </Button>
                     ) : (
                       <Button

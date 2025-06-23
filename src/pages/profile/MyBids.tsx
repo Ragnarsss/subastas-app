@@ -27,6 +27,8 @@ import {
   AccessTime as TimeIcon,
   Gavel as GavelIcon,
 } from "@mui/icons-material";
+import AuthDialog from "../../components/AuthDialog";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface UserBid {
   id: string;
@@ -46,14 +48,26 @@ type FilterType = "all" | "winning" | "outbid" | "won" | "lost";
 
 function MyBids() {
   const navigate = useNavigate();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [bids, setBids] = useState<UserBid[]>([]);
   const [filteredBids, setFilteredBids] = useState<UserBid[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+
+  // Check authentication
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setShowAuthDialog(true);
+    }
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
     const fetchMyBids = async () => {
+      if (!user) return;
+
       try {
+        // TODO: Fetch real bids from API using user.id
         const mockBids: UserBid[] = [
           {
             id: "1",
@@ -118,7 +132,23 @@ function MyBids() {
     };
 
     fetchMyBids();
-  }, []);
+  }, [user]);
+
+  // Show auth dialog if not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <AuthDialog
+        open={showAuthDialog}
+        onClose={() => {
+          setShowAuthDialog(false);
+          navigate("/");
+        }}
+        title="Acceso Restringido"
+        message="Para ver tus ofertas necesitas iniciar sesión."
+        action="ver tus ofertas"
+      />
+    );
+  }
 
   useEffect(() => {
     if (filter === "all") {
@@ -194,7 +224,7 @@ function MyBids() {
 
   const counts = getFilterCounts();
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Grid container spacing={3}>

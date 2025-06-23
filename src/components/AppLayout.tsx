@@ -1,17 +1,14 @@
 import React from "react";
 import { Box, CssBaseline } from "@mui/material";
 import Navbar from "./Navbar";
+import { useAuth } from "../contexts/AuthContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
 }
 
 function AppLayout({ children }: AppLayoutProps) {
-  // TODO: Obtener usuario del contexto/estado global
-  const user = {
-    name: "Juan Pérez",
-    avatar: "https://via.placeholder.com/40",
-  };
+  const { user } = useAuth();
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>

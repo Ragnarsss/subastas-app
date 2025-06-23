@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Container,
   Grid,
@@ -30,7 +30,10 @@ import {
   Settings as SettingsIcon,
   MonetizationOn as MoneyIcon,
   Timeline as TimelineIcon,
+  Inventory as InventoryIcon,
 } from "@mui/icons-material";
+import AuthDialog from "../../components/AuthDialog";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface UserProfile {
   id: string;
@@ -54,27 +57,25 @@ interface RecentActivity {
 }
 
 function ProfileOverview() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const navigate = useNavigate();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+
+  // Check authentication
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setShowAuthDialog(true);
+    }
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      try {
-        // TODO: Reemplazar con API real
-        const mockProfile: UserProfile = {
-          id: "1",
-          name: "Juan Pérez",
-          email: "juan.perez@email.com",
-          avatar: "https://via.placeholder.com/150",
-          joinDate: "2024-01-15",
-          rating: 4.8,
-          totalAuctions: 12,
-          totalBids: 45,
-          wonAuctions: 8,
-          reputation: 950,
-        };
+      if (!user) return;
 
+      try {
+        // TODO: Fetch real activity data from API
         const mockActivity: RecentActivity[] = [
           {
             id: "1",
@@ -98,7 +99,6 @@ function ProfileOverview() {
           },
         ];
 
-        setProfile(mockProfile);
         setRecentActivity(mockActivity);
       } catch (error) {
         console.error("Error fetching profile data:", error);
@@ -108,7 +108,23 @@ function ProfileOverview() {
     };
 
     fetchProfileData();
-  }, []);
+  }, [user]);
+
+  // Show auth dialog if not authenticated
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <AuthDialog
+        open={showAuthDialog}
+        onClose={() => {
+          setShowAuthDialog(false);
+          navigate("/");
+        }}
+        title="Acceso Restringido"
+        message="Para acceder a tu perfil necesitas iniciar sesión."
+        action="ver tu perfil"
+      />
+    );
+  }
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("es-CL", {
@@ -147,7 +163,7 @@ function ProfileOverview() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Grid container spacing={3}>
@@ -178,7 +194,7 @@ function ProfileOverview() {
     );
   }
 
-  if (!profile) {
+  if (!user) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Card>
@@ -191,6 +207,20 @@ function ProfileOverview() {
       </Container>
     );
   }
+
+  // Transform user data to match ProfileOverview interface
+  const profile = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar || "https://via.placeholder.com/150",
+    joinDate: user.createdAt || "2024-01-15",
+    rating: 4.8, // TODO: Get from API
+    totalAuctions: 12, // TODO: Get from API
+    totalBids: 45, // TODO: Get from API
+    wonAuctions: 8, // TODO: Get from API
+    reputation: 950, // TODO: Get from API
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -448,6 +478,25 @@ function ProfileOverview() {
                 Acciones Rápidas
               </Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <ListItemButton
+                  component={Link}
+                  to="/profile/items"
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 2,
+                    p: 2,
+                  }}
+                >
+                  <ListItemIcon>
+                    <InventoryIcon color="info" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Mis Items"
+                    secondary="Gestiona tus productos"
+                  />
+                </ListItemButton>
+
                 <ListItemButton
                   component={Link}
                   to="/auctions/create"
