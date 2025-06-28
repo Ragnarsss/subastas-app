@@ -30,7 +30,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuthDialog from "../../components/AuthDialog";
 import { useAuth } from "../../contexts/AuthContext";
-import { useAuctionAPI } from "../../hooks/useAuctionAPI";
+import { useCreateAuctionItem } from "../../hooks/useItems";
 import "./CreateAuction.css";
 
 interface AuctionForm {
@@ -44,16 +44,18 @@ interface AuctionForm {
 }
 
 const categories = [
-  "Electrónicos",
-  "Hogar y Jardín",
-  "Ropa y Accesorios",
-  "Deportes",
-  "Automóviles",
-  "Arte y Coleccionables",
-  "Libros y Música",
-  "Juguetes y Juegos",
-  "Salud y Belleza",
-  "Otros",
+  'Casa',
+    'Deporte',
+    'Arte',
+    'Herramienta',
+    'Vehículo',
+    'Auto',
+    'Motocicleta',
+    'Coleccionable',
+    'Departamento',
+    'Tecnología',
+    'Música',
+    'Otros',
 ];
 
 const durations = [
@@ -68,11 +70,11 @@ function CreateAuction() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const {
-    createAuction,
+    createAuctionItem,
     loading: apiLoading,
     error: apiError,
     clearError,
-  } = useAuctionAPI();
+  } = useCreateAuctionItem();
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<AuctionForm>({
@@ -116,32 +118,32 @@ function CreateAuction() {
       setLoading(true);
       clearError();
 
-      const auctionData = {
-        title: form.title,
+      // Calculate endDate based on duration
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + parseInt(form.duration));
+
+      const itemData = {
+        name: form.title,
         description: form.description,
-        category: form.category,
-        startingBid: parseFloat(form.startingBid),
-        duration: parseInt(form.duration),
-        minBidIncrement: form.minBidIncrement
-          ? parseFloat(form.minBidIncrement)
-          : undefined,
-        currency: form.currency,
+        initialPrice: parseFloat(form.startingBid),
+        endDate: endDate.toISOString(),
+        categories: [form.category], // Convert single category to array
       };
 
-      const result = await createAuction(auctionData);
+      console.log("Creating auction item with data:", itemData);
+      
+      const result = await createAuctionItem(itemData);
 
-      if (result.error || !result.success) {
-        throw new Error(
-          result.error || result.message || "Error creating auction"
-        );
+      if (!result.success) {
+        throw new Error(result.error || "Error creating auction item");
       }
 
-      alert(`¡${result.message || "Subasta creada exitosamente"}!`);
+      alert("¡Item de subasta creado exitosamente!");
       navigate("/auctions");
     } catch (error) {
-      console.error("Error al crear subasta:", error);
+      console.error("Error al crear item de subasta:", error);
       alert(
-        `Error al crear la subasta: ${
+        `Error al crear el item de subasta: ${
           error instanceof Error ? error.message : "Error desconocido"
         }`
       );

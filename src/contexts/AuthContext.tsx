@@ -10,13 +10,13 @@ interface User {
   role: string;
   createdAt?: string;
   updatedAt?: string;
-  avatar?: string;
 }
 
 interface AuthResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;
+  id?: string;
 }
 
 interface AuthContextType {
@@ -44,6 +44,7 @@ const LOGIN_MUTATION = gql`
       access_token
       refresh_token
       expires_in
+      id
     }
   }
 `;
@@ -123,6 +124,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("refresh_token", authResponse.refresh_token);
     localStorage.setItem("expires_in", authResponse.expires_in.toString());
     localStorage.setItem("login_time", Date.now().toString());
+    localStorage.setItem("userId", authResponse.id || "");
+
+    console.log("Tokens set successfully:", {
+      access_token: authResponse.access_token,
+      refresh_token: authResponse.refresh_token,
+      expires_in: authResponse.expires_in,
+      userId: authResponse.id,
+    });
 
     // Set authorization header for future requests
     client.setHeader("Authorization", `Bearer ${authResponse.access_token}`);
@@ -147,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const data = await client.request(LOGIN_MUTATION, { email, password });
+      console.log("Login successful:", data);
 
       setTokens(data.login);
       await fetchUser();
@@ -187,6 +197,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
+
+       console.log("User created:", userData);
+       console.log("Login successful:", loginData);
+
 
       setTokens(loginData.login);
       await fetchUser();

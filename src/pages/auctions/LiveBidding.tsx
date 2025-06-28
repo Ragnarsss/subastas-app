@@ -45,6 +45,15 @@ import {
 import "./LiveBidding.css";
 import { useAuction } from "../../hooks/useAuctions";
 import { useSocketIO } from "../../hooks/useSocketIO";
+import UserName from "../../components/UserName";
+import { useUserName } from "../../hooks/useUser";
+
+// Helper function to get user display name for messages
+const getUserDisplayName = (userId: string): string => {
+  // For now, we'll use the fallback format since these are dynamic messages
+  // In a future version, we could cache user names or make async calls
+  return `Usuario ${userId.substring(0, 8)}`;
+};
 
 interface LiveBid {
   id: string;
@@ -182,7 +191,7 @@ function LiveBidding() {
         timestamp: new Date(data.timestamp),
         message: `New bid: ${formatPrice(
           data.amount
-        )} by ${data.userId.substring(0, 8)}`,
+        )} by ${getUserDisplayName(data.userId)}`,
       });
 
       // Refresh auction data
@@ -217,7 +226,7 @@ function LiveBidding() {
         userId: data.userId,
         data: data,
         timestamp: new Date(data.timestamp),
-        message: `User ${data.userId.substring(0, 8)} joined the auction`,
+        message: `User ${getUserDisplayName(data.userId)} joined the auction`,
       });
     };
 
@@ -232,7 +241,7 @@ function LiveBidding() {
         userId: data.userId,
         data: data,
         timestamp: new Date(data.timestamp),
-        message: `User ${data.userId.substring(0, 8)} left the auction`,
+        message: `User ${getUserDisplayName(data.userId)} left the auction`,
       });
     };
 
@@ -752,7 +761,7 @@ function LiveBidding() {
                             variant="body2"
                             fontWeight={index === 0 ? 600 : 400}
                           >
-                            Usuario {bid.userId.substring(0, 8)}
+                            <UserName userId={bid.userId} />
                             {index === 0 && (
                               <Chip
                                 label="LÍDER"
@@ -800,7 +809,7 @@ function LiveBidding() {
                           }}
                         >
                           <Typography variant="body2">
-                            Usuario {bid.user_id.substring(0, 8)}
+                            <UserName userId={bid.user_id} />
                           </Typography>
                           <Typography variant="subtitle2" fontWeight="bold">
                             {formatPrice(parseFloat(bid.amount))}

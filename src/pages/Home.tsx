@@ -84,7 +84,7 @@ function Home() {
           gutterBottom
           sx={{ fontSize: { xs: "2.5rem", md: "3.5rem" } }}
         >
-          Bienvenido a SubastasApp
+          Bienvenido a SubastApp
         </Typography>
         <Typography
           variant="h5"
@@ -235,12 +235,18 @@ function Home() {
           sx={{ gap: 2 }}
         >
           {[
-            "Electrónicos",
-            "Hogar y Jardín",
-            "Automóviles",
-            "Arte y Coleccionables",
-            "Deportes",
-            "Ropa y Accesorios",
+            'Casa',
+            'Deporte',
+            'Arte',
+            'Herramienta',
+            'Vehículo',
+            'Auto',
+            'Motocicleta',
+            'Coleccionable',
+            'Departamento',
+            'Tecnología',
+            'Música',
+            'Otros',
           ].map((category) => (
             <Chip
               key={category}
@@ -292,23 +298,25 @@ function Home() {
           spacing={2}
           justifyContent="center"
         >
-          <Button
-            component={Link}
-            to="/register"
-            variant="contained"
-            size="large"
-            sx={{
-              bgcolor: "white",
-              color: "primary.main",
-              py: 1.5,
-              px: 4,
-              "&:hover": {
-                bgcolor: "grey.100",
-              },
-            }}
-          >
-            Crear Cuenta Gratis
-          </Button>
+          {!localStorage.getItem("access_token") && (
+            <Button
+              component={Link}
+              to="/register"
+              variant="contained"
+              size="large"
+              sx={{
+                bgcolor: "white",
+                color: "primary.main",
+                py: 1.5,
+                px: 4,
+                "&:hover": {
+                  bgcolor: "grey.100",
+                },
+              }}
+            >
+              Crear Cuenta Gratis
+            </Button>
+          )}
 
           <Button
             component={Link}

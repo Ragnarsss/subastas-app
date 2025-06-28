@@ -1,12 +1,11 @@
 import {
   FilterList as FilterIcon,
   Gavel as GavelIcon,
-  Person as PersonIcon,
   Search as SearchIcon,
   Sort as SortIcon,
   AccessTime as TimeIcon,
   TrendingUp as TrendingUpIcon,
-  Visibility as VisibilityIcon,
+  Person as PersonIcon,
 } from "@mui/icons-material";
 import {
   Alert,
@@ -31,11 +30,13 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthDialog from "../../components/AuthDialog";
+import UserName from "../../components/UserName";
 import { useAuth } from "../../contexts/AuthContext";
-import { useAuctions } from "../../hooks/useAuctions";
+import { useItems } from "../../hooks/useItems";
+import { useUserName } from "../../hooks/useUser";
 import "./AuctionHome.css";
 
 type SortOption =
@@ -44,7 +45,7 @@ type SortOption =
   | "lowest_bid"
   | "newest"
   | "most_popular";
-type FilterOption = "all" | "active" | "pending" | "completed" | "cancelled";
+type FilterOption = "all" | "available" | "auctioned" | "sold" | "expired";
 
 function AuctionHome() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,34 +56,39 @@ function AuctionHome() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Use the auctions hook instead of API hook
-  const { auctions, loading, error, refetch, clearError } = useAuctions({
-    page: 1,
-    limit: 50,
-    sortBy: "endDate",
-    sortOrder: "asc",
-  });
+  // Use the items hook and filter for auctioned items
+  const { items, loading, error, refetch, clearError } = useItems();
+
+  // Component interno para mostrar avatar con primera letra del nombre real
+  const UserAvatar = ({ userId }: { userId: string }) => {
+    const { userName } = useUserName(userId);
+    const firstLetter = userName ? userName.charAt(0).toUpperCase() : userId.charAt(0).toUpperCase();
+    
+    return (
+      <Avatar sx={{ width: 24, height: 24 }}>
+        {firstLetter}
+      </Avatar>
+    );
+  };
 
   // Filter auctions based on search term and local filters
-  const filteredAuctions = auctions
-    .filter((auction) => {
+  const filteredAuctions = items
+    .filter((item) => {
       const matchesSearch = searchTerm
-        ? auction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          auction.description.toLowerCase().includes(searchTerm.toLowerCase())
+        ? item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.description.toLowerCase().includes(searchTerm.toLowerCase())
         : true;
 
-      // Fix the filter logic to handle different status formats
+      // Filter logic for item status
       let matchesFilter = false;
       if (filterBy === "all") {
         matchesFilter = true;
-      } else if (filterBy === "active") {
-        // Match all active status variations
-        matchesFilter =
-          auction.status === "active" ||
-          auction.status === "ACTIVE" ||
-          auction.status === "Hello";
-      } else {
-        matchesFilter = auction.status === filterBy;
+      } else if (filterBy === "auctioned") {
+        matchesFilter = item.isAuctioned;
+      } else if (filterBy === "available") {
+        matchesFilter = !item.isAuctioned;
+      } else if (filterBy === "expired") {
+        matchesFilter = new Date(item.endDate) < new Date();
       }
 
       return matchesSearch && matchesFilter;
@@ -91,18 +97,18 @@ function AuctionHome() {
       switch (sortBy) {
         case "ending_soon":
           return (
-            new Date(a.end_time).getTime() - new Date(b.end_time).getTime()
+            new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
           );
         case "highest_bid":
-          return b.currentBid - a.currentBid;
+          return (b.currentHighestBid || b.initialPrice) - (a.currentHighestBid || a.initialPrice);
         case "lowest_bid":
-          return a.currentBid - b.currentBid;
+          return (a.currentHighestBid || a.initialPrice) - (b.currentHighestBid || b.initialPrice);
         case "most_popular":
           return (b.views || 0) - (a.views || 0);
         case "newest":
         default:
           return (
-            new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+            new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
           );
       }
     });
@@ -130,14 +136,10 @@ function AuctionHome() {
 
   const getStatusChip = (status: string) => {
     const statusConfig = {
-      pending: { label: "Pendiente", color: "warning" as const },
-      active: { label: "Activa", color: "success" as const },
-      completed: { label: "Completada", color: "default" as const },
-      cancelled: { label: "Cancelada", color: "error" as const },
-      // Keep old values for backward compatibility
-      ACTIVE: { label: "Activa", color: "success" as const },
-      ENDED: { label: "Finalizada", color: "default" as const },
-      Hello: { label: "Activa", color: "success" as const }, // Handle test data
+      available: { label: "Disponible", color: "info" as const },
+      auctioned: { label: "En Subasta", color: "success" as const },
+      sold: { label: "Vendido", color: "default" as const },
+      expired: { label: "Expirado", color: "error" as const },
     };
     const config = statusConfig[status as keyof typeof statusConfig] || {
       label: status,
@@ -162,13 +164,13 @@ function AuctionHome() {
   };
 
   // Error state
-  if (error && auctions.length === 0) {
+  if (error && items.length === 0) {
     return (
       <Container maxWidth="xl" sx={{ py: 4 }}>
         <Paper sx={{ p: 6, textAlign: "center" }}>
           <GavelIcon sx={{ fontSize: 64, color: "error.main", mb: 2 }} />
           <Typography variant="h6" color="error" gutterBottom>
-            Error al cargar las subastas
+            Error al cargar los items
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {error}
@@ -207,10 +209,10 @@ function AuctionHome() {
       {/* Header */}
       <Box sx={{ mb: 4, textAlign: "center" }}>
         <Typography variant="h3" component="h1" fontWeight="bold" gutterBottom>
-          Subastas Activas
+          Items y Subastas
         </Typography>
         <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
-          Descubre productos únicos y realiza ofertas en tiempo real
+          Descubre productos únicos disponibles y en subasta
         </Typography>
 
         {/* Estadísticas rápidas */}
@@ -222,30 +224,26 @@ function AuctionHome() {
         >
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="h4" fontWeight="bold" color="primary.main">
-              {auctions.length}
+              {items.length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Subastas Disponibles
+              Items Disponibles
             </Typography>
           </Box>
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="h4" fontWeight="bold" color="success.main">
-              {auctions.reduce((acc, auction) => acc + auction.bids.length, 0)}
+              {items.filter(item => item.currentHighestBid).length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Ofertas Realizadas
+              Con Ofertas
             </Typography>
           </Box>
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="h4" fontWeight="bold" color="info.main">
-              {
-                auctions.filter(
-                  (a) => a.status === "active" || a.status === "ACTIVE"
-                ).length
-              }
+              {items.filter(item => item.isAuctioned).length}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Subastas Activas
+              En Subasta
             </Typography>
           </Box>
         </Stack>
@@ -279,22 +277,15 @@ function AuctionHome() {
               onClick={() => setFilterBy("all")}
               startIcon={<GavelIcon />}
             >
-              Todas ({auctions.length})
+              Todas ({items.length})
             </Button>
             <Button
-              variant={filterBy === "active" ? "contained" : "outlined"}
-              onClick={() => setFilterBy("active")}
+              variant={filterBy === "auctioned" ? "contained" : "outlined"}
+              onClick={() => setFilterBy("auctioned")}
               color="success"
             >
-              Activas (
-              {
-                auctions.filter(
-                  (a) =>
-                    a.status === "active" ||
-                    a.status === "ACTIVE" ||
-                    a.status === "Hello"
-                ).length
-              }
+              Subastadas (
+              {items.filter(item => item.isAuctioned).length}
               )
             </Button>
           </ButtonGroup>
@@ -326,10 +317,9 @@ function AuctionHome() {
                 startAdornment={<FilterIcon sx={{ mr: 1 }} />}
               >
                 <MenuItem value="all">Todas</MenuItem>
-                <MenuItem value="active">Activas</MenuItem>
-                <MenuItem value="pending">Pendientes</MenuItem>
-                <MenuItem value="completed">Completadas</MenuItem>
-                <MenuItem value="cancelled">Canceladas</MenuItem>
+                <MenuItem value="auctioned">En Subasta</MenuItem>
+                <MenuItem value="available">Disponibles</MenuItem>
+                <MenuItem value="expired">Expiradas</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -369,25 +359,25 @@ function AuctionHome() {
         <Paper sx={{ p: 6, textAlign: "center" }}>
           <GavelIcon sx={{ fontSize: 64, color: "grey.400", mb: 2 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            No se encontraron subastas
+            No se encontraron items
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {searchTerm
               ? "Intenta con otros términos de búsqueda"
-              : "No hay subastas disponibles en este momento"}
+              : "No hay items disponibles en este momento"}
           </Typography>
           <Button
             onClick={handleCreateAuctionClick}
             variant="contained"
             startIcon={<GavelIcon />}
           >
-            Crear la primera subasta
+            Crear el primer item
           </Button>
         </Paper>
       ) : (
         <Grid container spacing={3}>
-          {filteredAuctions.map((auction) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={auction.id}>
+          {filteredAuctions.map((item) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={item._id}>
               <Card
                 sx={{
                   height: "100%",
@@ -399,15 +389,15 @@ function AuctionHome() {
                   <CardMedia
                     component="img"
                     height="200"
-                    image={auction.images[0]}
-                    alt={auction.title}
+                    image={item.image || "https://via.placeholder.com/300x200"}
+                    alt={item.name}
                   />
                   <Box sx={{ position: "absolute", top: 12, right: 12 }}>
-                    {getStatusChip(auction.status)}
+                    {getStatusChip(item.isAuctioned ? "auctioned" : "available")}
                   </Box>
                   <Box sx={{ position: "absolute", top: 12, left: 12 }}>
                     <Chip
-                      label={auction.category || "Sin categoría"}
+                      label={item.categories?.[0] || "Sin categoría"}
                       size="small"
                       sx={{ bgcolor: "rgba(0,0,0,0.7)", color: "white" }}
                     />
@@ -430,7 +420,7 @@ function AuctionHome() {
                       WebkitBoxOrient: "vertical",
                     }}
                   >
-                    {auction.title}
+                    {item.name}
                   </Typography>
                   <Typography
                     variant="body2"
@@ -445,7 +435,7 @@ function AuctionHome() {
                       WebkitBoxOrient: "vertical",
                     }}
                   >
-                    {auction.description}
+                    {item.description}
                   </Typography>
 
                   {/* Información del vendedor */}
@@ -461,54 +451,49 @@ function AuctionHome() {
                     }}
                   >
                     <PersonIcon fontSize="small" color="primary" />
-                    <Avatar
-                      sx={{ width: 24, height: 24 }}
-                      src={auction.seller?.avatar}
-                    >
-                      {auction.seller?.name.charAt(0)}
-                    </Avatar>
+                    <UserAvatar userId={item.userId} />
                     <Typography variant="caption" color="text.secondary">
-                      {auction.seller?.name} ⭐ {auction.seller?.rating}
+                      Vendido por: <UserName userId={item.userId} />
                     </Typography>
                   </Box>
 
                   {/* Precio actual */}
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Oferta actual:
+                      {item.currentHighestBid
+                        ? "Último precio:"
+                        : "Precio inicial:"}
                     </Typography>
                     <Typography
                       variant="h6"
                       fontWeight="bold"
                       color="primary.main"
                     >
-                      {auction.currentBid > 0
-                        ? formatPrice(auction.currentBid)
-                        : formatPrice(parseFloat(auction.base_price))}
+                      {formatPrice(item.currentHighestBid || item.initialPrice)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {auction.currency}
+                      CLP
                     </Typography>
                   </Box>
 
                   {/* Estadísticas */}
                   <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                    <Box
+                    {/* <Box
                       sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                     >
                       <TrendingUpIcon fontSize="small" color="success" />
                       <Typography variant="caption">
-                        {auction.bids.length} ofertas
+                        {item.currentHighestBid ? "1" : "0"} ofertas
                       </Typography>
-                    </Box>
-                    <Box
+                    </Box> */}
+                    {/* <Box
                       sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
                     >
                       <VisibilityIcon fontSize="small" color="info" />
                       <Typography variant="caption">
-                        {auction.views || 0} vistas
+                        {item.views || 0} vistas
                       </Typography>
-                    </Box>
+                    </Box> */}
                   </Stack>
 
                   {/* Tiempo restante */}
@@ -526,19 +511,19 @@ function AuctionHome() {
                       color="warning.main"
                       fontWeight="bold"
                     >
-                      {getTimeRemaining(auction.end_time)}
+                      {getTimeRemaining(item.endDate)}
                     </Typography>
                   </Box>
 
                   {/* Botón de acción */}
                   <Button
                     component={Link}
-                    to={`/auctions/${auction.id}`}
+                    to={`/auctions/${item._id}`}
                     variant="contained"
                     fullWidth
                     sx={{ mt: "auto" }}
                   >
-                    Ver Subasta
+                    Ver Item
                   </Button>
                 </CardContent>
               </Card>
@@ -555,7 +540,7 @@ function AuctionHome() {
           disabled={loading}
           startIcon={loading ? undefined : <GavelIcon />}
         >
-          {loading ? "Cargando..." : "Actualizar Subastas"}
+          {loading ? "Cargando..." : "Actualizar Items"}
         </Button>
       </Box>
 

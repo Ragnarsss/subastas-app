@@ -4,7 +4,6 @@ import {
   Gavel as GavelIcon,
   MonetizationOn as MoneyIcon,
   Person as PersonIcon,
-  PhotoCamera as PhotoCameraIcon,
   Star as StarIcon,
   AccessTime as TimeIcon,
   TrendingUp as TrendingUpIcon,
@@ -38,9 +37,10 @@ import {
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AuthDialog from "../../components/AuthDialog";
+import UserName from "../../components/UserName";
 import { useAuth } from "../../contexts/AuthContext";
-import { useAuction } from "../../hooks/useAuctions";
-import { useAuctionAPI } from "../../hooks/useAuctionAPI";
+import { useItemById } from "../../hooks/useItems";
+import { useBids } from "../../hooks/useBid";
 import "./AuctionDetail.css";
 
 function AuctionDetail() {
@@ -48,20 +48,38 @@ function AuctionDetail() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
-  // Use the custom hooks
-  const { auction, loading, error, refetch, clearError } = useAuction(id || "");
-  const {
-    createBid,
-    loading: bidLoading,
-    error: bidError,
-    clearError: clearBidError,
-  } = useAuctionAPI();
+  // Use the item by ID hook to get item details
+  const { item, loading: itemsLoading, error: itemsError, refetch: refetchItem } = useItemById(id || "");
+  
+  // Log for debugging
+  console.log("AuctionDetail - ID from params:", id);
+  console.log("AuctionDetail - Found item:", item);
+  
+  // Use the bids hook to get bids for this item
+  const { 
+    bids, 
+    loading: bidsLoading, 
+    error: bidsError, 
+    createBid, 
+    highestBid,
+    userBids,
+    isUserHighestBidder,
+    clearError: clearBidsError,
+    refetch: refetchBids
+  } = useBids(id || "", user?.id);
+
+  // Log bids data for debugging
+  console.log("AuctionDetail - Bids:", bids);
+  console.log("AuctionDetail - Highest bid:", highestBid);
 
   // Estados locales
   const [bidAmount, setBidAmount] = useState<string>("");
   const [submittingBid, setSubmittingBid] = useState(false);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+
+  // Combined loading state
+  const loading = itemsLoading || bidsLoading;
+  const error = itemsError || bidsError;
 
   // Función para realizar una oferta
   const handlePlaceBid = async (e: React.FormEvent) => {
@@ -73,10 +91,24 @@ function AuctionDetail() {
       return;
     }
 
-    if (!auction || !bidAmount) return;
+    if (!item || !bidAmount) {
+      alert("Por favor ingresa un monto para la puja");
+      return;
+    }
 
     const amount = parseFloat(bidAmount);
-    const minBid = auction.currentBid + parseFloat(auction.min_bid_increment);
+    const currentHighest = highestBid?.amount || item.initialPrice;
+    const minBid = currentHighest + 1000; // Minimum increment of 1000
+
+    if (isNaN(amount) || amount <= 0) {
+      alert("Por favor ingresa un monto válido");
+      return;
+    }
+
+    if (amount <= currentHighest) {
+      alert(`La oferta debe ser mayor a ${formatPrice(currentHighest)}`);
+      return;
+    }
 
     if (amount < minBid) {
       alert(`La oferta debe ser al menos ${formatPrice(minBid)}`);
@@ -85,25 +117,38 @@ function AuctionDetail() {
 
     try {
       setSubmittingBid(true);
-      clearBidError();
+      clearBidsError();
 
-      // Use the auction API to create bid
-      const result = await createBid(auction.id, {
-        user_id: user.id,
-        amount: amount.toString(),
+      console.log("Creating bid with data:", {
+        item_id: item._id,
+        amount: amount,
       });
 
+      // Use the bids hook to create bid
+      const result = await createBid({
+        item_id: item._id,
+        amount: amount,
+      });
+
+      console.log("Bid creation result:", result);
+
       if (result.success) {
-        // Refetch auction data to get updated bids and highest bid
-        await refetch();
         setBidAmount("");
+        
+        // Refresh both the item and bids to show updated data
+        console.log("Refreshing item and bids after successful bid");
+        await Promise.all([
+          refetchItem(),
+          refetchBids()
+        ]);
+        
         alert("¡Oferta realizada con éxito!");
       } else {
         throw new Error(result.error || "Error al procesar la oferta");
       }
     } catch (err) {
-      alert("Error al realizar la oferta");
-      console.error(err);
+      console.error("Error creating bid:", err);
+      alert("Error al realizar la oferta: " + (err instanceof Error ? err.message : "Error desconocido"));
     } finally {
       setSubmittingBid(false);
     }
@@ -125,32 +170,17 @@ function AuctionDetail() {
       setShowAuthDialog(true);
       return;
     }
-    navigate(`/auctions/live/${auction?.id}`);
+    navigate(`/auctions/live/${item?._id}`);
   };
 
-  // Check if current user is the highest bidder
+  // Check if current user is the highest bidder (now using useBids hook)
   const isCurrentUserHighestBidder = () => {
-    if (!user || !auction?.bids.length) return false;
-
-    // Sort bids by amount to get the highest
-    const sortedBids = [...auction.bids].sort(
-      (a, b) => parseFloat(b.amount) - parseFloat(a.amount)
-    );
-    const highestBid = sortedBids[0];
-
-    return highestBid?.user_id === user.id;
+    return isUserHighestBidder;
   };
 
-  // Get user's bid history for this auction
+  // Get user's bid history for this item (now using useBids hook)
   const getUserBids = () => {
-    if (!user || !auction?.bids.length) return [];
-
-    return auction.bids
-      .filter((bid) => bid.user_id === user.id)
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+    return userBids;
   };
 
   // Función para formatear precios
@@ -241,18 +271,18 @@ function AuctionDetail() {
     );
   }
 
-  if (error || !auction) {
+  if (error || !item) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error" sx={{ mb: 3 }}>
-          {error || "Subasta no encontrada"}
+          {error || "Item no encontrado"}
         </Alert>
         <Button
           onClick={() => navigate("/auctions")}
           variant="contained"
           startIcon={<ArrowBackIcon />}
         >
-          Volver a subastas
+          Volver a items
         </Button>
       </Container>
     );
@@ -267,7 +297,7 @@ function AuctionDetail() {
           startIcon={<ArrowBackIcon />}
           sx={{ mb: 2 }}
         >
-          Volver a subastas
+          Volver a Items
         </Button>
       </Box>{" "}
       <Grid container spacing={4}>
@@ -277,59 +307,17 @@ function AuctionDetail() {
             <CardMedia
               component="img"
               height={400}
-              image={auction.images[selectedImageIndex]}
-              alt={auction.title}
+              image={item.image || "https://via.placeholder.com/400x300"}
+              alt={item.name}
               sx={{ objectFit: "cover" }}
             />
-          </Card>{" "}
-          {/* Thumbnails */}
-          {auction.images.length > 1 && (
-            <Box sx={{ display: "flex", gap: 1, overflowX: "auto" }}>
-              {auction.images.map((image, index) => (
-                <Card
-                  key={index}
-                  sx={{
-                    minWidth: 80,
-                    cursor: "pointer",
-                    border: selectedImageIndex === index ? 2 : 1,
-                    borderColor:
-                      selectedImageIndex === index
-                        ? "primary.main"
-                        : "grey.300",
-                    position: "relative",
-                  }}
-                  onClick={() => setSelectedImageIndex(index)}
-                >
-                  <CardMedia
-                    component="img"
-                    height={60}
-                    image={image}
-                    alt={`${auction.title} ${index + 1}`}
-                  />
-                  {selectedImageIndex === index && (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        bgcolor: "primary.main",
-                        borderRadius: "50%",
-                        p: 0.5,
-                      }}
-                    >
-                      <PhotoCameraIcon sx={{ fontSize: 12, color: "white" }} />
-                    </Box>
-                  )}
-                </Card>
-              ))}
-            </Box>
-          )}
+          </Card>
         </Grid>{" "}
         {/* Columna derecha - Información */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Stack spacing={3}>
             {" "}
-            {/* Header de la subasta */}
+            {/* Header del item */}
             <Box>
               <Box
                 sx={{
@@ -340,14 +328,14 @@ function AuctionDetail() {
                 }}
               >
                 <Typography variant="h4" component="h1" fontWeight="bold">
-                  {auction.title}
+                  {item.name}
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                  {getStatusChip(auction.status)}
+                  {getStatusChip(item.status)}
                   <IconButton
                     color="primary"
                     size="small"
-                    title="Compartir subasta"
+                    title="Compartir item"
                   >
                     <VisibilityIcon />
                   </IconButton>
@@ -356,13 +344,13 @@ function AuctionDetail() {
 
               <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
                 <Chip
-                  label={auction.category}
+                  label={item.categories[0] || "Sin categoría"}
                   color="primary"
                   variant="outlined"
                   size="small"
                 />
                 <Chip
-                  label={`${auction.views} vistas`}
+                  label={`${item.views || 0} vistas`}
                   icon={<VisibilityIcon />}
                   variant="outlined"
                   size="small"
@@ -377,17 +365,17 @@ function AuctionDetail() {
                 Vendedor
               </Typography>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <Avatar src={auction.seller.avatar}>
-                  {auction.seller.name.charAt(0)}
+                <Avatar>
+                  {item.userId.charAt(0).toUpperCase()}
                 </Avatar>
                 <Box>
                   <Typography variant="body1" fontWeight={600}>
-                    {auction.seller.name}
+                    <UserName userId={item.userId} />
                   </Typography>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <StarIcon color="warning" fontSize="small" />
                     <Typography variant="body2" color="text.secondary">
-                      {auction.seller.rating}/5
+                      4.5/5
                     </Typography>
                   </Box>
                 </Box>
@@ -407,7 +395,7 @@ function AuctionDetail() {
                   Descripción del Producto
                 </Typography>
                 <Typography variant="body1" color="text.secondary" paragraph>
-                  {auction.description}
+                  {item.description}
                 </Typography>
               </CardContent>
             </Card>
@@ -428,17 +416,17 @@ function AuctionDetail() {
                     color="text.secondary"
                     gutterBottom
                   >
-                    OFERTA ACTUAL
+                    {highestBid ? "OFERTA ACTUAL" : "PRECIO INICIAL"}
                   </Typography>
                   <Typography
                     variant="h3"
                     fontWeight="bold"
                     color="primary.main"
                   >
-                    {formatPrice(auction.currentBid)}
+                    {formatPrice(highestBid?.amount || item.initialPrice)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {auction.bids.length} ofertas realizadas
+                    {bids.length} ofertas realizadas
                   </Typography>
                 </Box>
                 <Divider /> {/* Tiempo restante */}
@@ -456,7 +444,7 @@ function AuctionDetail() {
                     color="warning.main"
                     fontWeight="bold"
                   >
-                    {getTimeRemaining(auction.end_time)}
+                    {getTimeRemaining(item.endDate)}
                   </Typography>
                 </Box>
                 {/* Progreso de tiempo */}
@@ -487,20 +475,20 @@ function AuctionDetail() {
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <VisibilityIcon fontSize="small" color="info" />
                     <Typography variant="caption">
-                      {auction.views || 0} vistas
+                      {item.views || 0} vistas
                     </Typography>
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <TrendingUpIcon fontSize="small" color="success" />
                     <Typography variant="caption">
-                      {auction.bids.length} ofertas
+                      {bids.length} ofertas
                     </Typography>
                   </Box>
                 </Stack>
               </Stack>
             </Paper>
             {/* Current user's bidding status */}
-            {isAuthenticated && user && auction && (
+            {isAuthenticated && user && item && (
               <Paper
                 elevation={0}
                 sx={{
@@ -511,7 +499,7 @@ function AuctionDetail() {
                 }}
               >
                 <Typography variant="subtitle2" color="info.main" gutterBottom>
-                  Tu estado en esta subasta
+                  Tu estado en este item
                 </Typography>
 
                 {getUserBids().length > 0 ? (
@@ -519,13 +507,13 @@ function AuctionDetail() {
                     {isCurrentUserHighestBidder() ? (
                       <Alert severity="success" sx={{ mb: 2 }}>
                         🏆 ¡Estás ganando! Tu oferta de{" "}
-                        {formatPrice(parseFloat(getUserBids()[0].amount))} es la
+                        {formatPrice(getUserBids()[0].amount)} es la
                         más alta.
                       </Alert>
                     ) : (
                       <Alert severity="warning" sx={{ mb: 2 }}>
                         ⚠️ Tu oferta de{" "}
-                        {formatPrice(parseFloat(getUserBids()[0].amount))} ha
+                        {formatPrice(getUserBids()[0].amount)} ha
                         sido superada.
                       </Alert>
                     )}
@@ -535,7 +523,7 @@ function AuctionDetail() {
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Última oferta:{" "}
-                      {formatPrice(parseFloat(getUserBids()[0].amount))}
+                      {formatPrice(getUserBids()[0].amount)}
                       el{" "}
                       {new Date(getUserBids()[0].created_at).toLocaleDateString(
                         "es-CL"
@@ -544,47 +532,52 @@ function AuctionDetail() {
                   </Box>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
-                    Aún no has participado en esta subasta
+                    Aún no has participado en este item
                   </Typography>
                 )}
               </Paper>
             )}
             {/* Formulario para ofertar */}
-            {(auction?.status === "active" ||
-              auction?.status === "ACTIVE" ||
-              auction?.status === "Hello") && (
+            {(item?.status === "available" ||
+              item?.status === "auctioned") && (
               <Paper elevation={1} sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   Realizar Oferta
                 </Typography>
 
                 {/* Bid error alert */}
-                {bidError && (
+                {bidsError && (
                   <Alert
                     severity="error"
                     sx={{ mb: 2 }}
-                    onClose={clearBidError}
+                    onClose={clearBidsError}
                   >
-                    {bidError}
+                    {bidsError}
                   </Alert>
                 )}
 
-                {/* Live bidding button */}
+                {/* Live bidding info */}
                 <Alert severity="info" sx={{ mb: 2 }}>
                   <Box
                     sx={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: 1,
                     }}
                   >
-                    <span>
-                      La oferta mínima es{" "}
-                      {formatPrice(
-                        auction.currentBid +
-                          parseFloat(auction.min_bid_increment)
-                      )}
-                    </span>
+                    <Box>
+                      <Typography variant="body2" fontWeight="bold">
+                        Oferta mínima: {formatPrice((highestBid?.amount || item.initialPrice) + 1000)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {highestBid 
+                          ? `Actual: ${formatPrice(highestBid.amount)} por ${highestBid.userName || 'Usuario'}`
+                          : `Precio inicial: ${formatPrice(item.initialPrice)}`
+                        }
+                      </Typography>
+                    </Box>
                     <Button
                       onClick={handleLiveBidClick}
                       variant="contained"
@@ -608,22 +601,17 @@ function AuctionDetail() {
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
                         placeholder={formatPrice(
-                          auction.currentBid +
-                            parseFloat(auction.min_bid_increment)
+                          (highestBid?.amount || item.initialPrice) + 1000
                         )}
                         inputProps={{
-                          min:
-                            auction.currentBid +
-                            parseFloat(auction.min_bid_increment),
+                          min: (highestBid?.amount || item.initialPrice) + 1000,
                           step: "1000", // Step in CLP
                         }}
                         required
                         helperText={
                           isCurrentUserHighestBidder()
                             ? "Ya tienes la oferta más alta"
-                            : `Incremento mínimo: ${formatPrice(
-                                parseFloat(auction.min_bid_increment)
-                              )}`
+                            : `Incremento mínimo: ${formatPrice(1000)}`
                         }
                         InputProps={{
                           startAdornment: (
@@ -634,14 +622,14 @@ function AuctionDetail() {
                       <Button
                         type="submit"
                         variant="contained"
-                        disabled={submittingBid || bidLoading}
+                        disabled={submittingBid || loading}
                         startIcon={<GavelIcon />}
                         sx={{ minWidth: 120, height: 56 }}
                         color={
                           isCurrentUserHighestBidder() ? "success" : "primary"
                         }
                       >
-                        {submittingBid || bidLoading
+                        {submittingBid || bidsLoading
                           ? "Ofertando..."
                           : isCurrentUserHighestBidder()
                           ? "Aumentar"
@@ -675,13 +663,25 @@ function AuctionDetail() {
       </Grid>
       {/* Enhanced bid history with user highlighting */}
       <Paper sx={{ mt: 4, p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Historial de Ofertas ({auction.bids.length})
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">
+            Historial de Ofertas ({bids.length})
+          </Typography>
+          {bidsLoading && (
+            <Typography variant="body2" color="text.secondary">
+              Cargando pujas...
+            </Typography>
+          )}
+          {bidsError && (
+            <Typography variant="body2" color="error">
+              Error cargando pujas (usando datos de ejemplo)
+            </Typography>
+          )}
+        </Box>
 
-        {auction.bids.length > 0 ? (
+        {bids.length > 0 ? (
           <List>
-            {auction.bids.map((bid, index) => {
+            {bids.map((bid, index) => {
               const isUserBid = user && bid.user_id === user.id;
               const isHighestBid = index === 0;
 
@@ -736,9 +736,11 @@ function AuctionDetail() {
                           variant="body1"
                           fontWeight={isHighestBid || isUserBid ? 600 : 400}
                         >
-                          {isUserBid
-                            ? `${user.name} (Tú)`
-                            : `Usuario ${bid.user_id.substring(0, 8)}`}
+                          {isUserBid ? (
+                            `${user.name} (Tú)`
+                          ) : (
+                            <UserName userId={bid.user_id} />
+                          )}
                           {isHighestBid && (
                             <Chip
                               label="GANANDO"
@@ -767,7 +769,7 @@ function AuctionDetail() {
                               : "text.primary"
                           }
                         >
-                          {formatPrice(parseFloat(bid.amount))}
+                          {formatPrice(bid.amount)}
                         </Typography>
                       </Box>
                     }
@@ -780,8 +782,14 @@ function AuctionDetail() {
         ) : (
           <Box sx={{ textAlign: "center", py: 4 }}>
             <GavelIcon sx={{ fontSize: 48, color: "grey.400", mb: 2 }} />
-            <Typography variant="body1" color="text.secondary">
-              No hay ofertas aún. ¡Sé el primero en ofertar!
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No hay ofertas aún
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              ¡Sé el primero en ofertar por este item!
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Precio inicial: {formatPrice(item?.initialPrice || 0)}
             </Typography>
           </Box>
         )}

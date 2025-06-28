@@ -125,7 +125,7 @@ function Navbar({ user = null }: NavbarProps) {
                 fontSize: { xs: "1.1rem", md: "1.25rem" },
               }}
             >
-              SubastasApp
+              SubastApp
             </Typography>
           </Box>
 
@@ -190,7 +190,8 @@ function Navbar({ user = null }: NavbarProps) {
                     <PersonIcon sx={{ mr: 1 }} />
                     Mi Perfil
                   </MenuItem>
-                  <MenuItem
+
+                  {/* <MenuItem
                     onClick={() => {
                       navigate("/profile/auctions");
                       handleProfileMenuClose();
@@ -198,7 +199,8 @@ function Navbar({ user = null }: NavbarProps) {
                   >
                     <GavelIcon sx={{ mr: 1 }} />
                     Mis Subastas
-                  </MenuItem>
+                  </MenuItem> */}
+
                   <MenuItem onClick={handleLogout}>
                     <LogoutIcon sx={{ mr: 1 }} />
                     Cerrar Sesión
